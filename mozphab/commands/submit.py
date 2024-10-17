@@ -602,7 +602,6 @@ def _submit(repo: Repository, args: argparse.Namespace):
             logger.info("\nCreating new revision:")
 
         logger.info("%s %s", commit.name, revision_title_from_commit(commit))
-        repo.checkout(commit.node)
 
         # Create a diff if needed
         with wait_message("Creating local diff..."):
