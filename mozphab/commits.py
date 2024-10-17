@@ -45,3 +45,7 @@ class Commit:
             return False
 
         return bool(self.reviewers.get("granted") or self.reviewers.get("request"))
+
+    @property
+    def message(self) -> str:
+        return f"{self.title}\n\n{self.body}"
