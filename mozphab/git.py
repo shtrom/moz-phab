@@ -169,7 +169,9 @@ class Git(Repository):
         for commit in commits:
             if commit.node == commit.orig_node:
                 continue
-            branches = self.git_out(["branch", "--contains", commit.orig_node])
+            branches = self.git_out(
+                ["branch", "--contains", commit.orig_node, "--format=%(refname)"]
+            )
             for branch in branches:
                 if branch.startswith(("* (", "+ ")):
                     # Omit `* (detached from {SHA1})`
@@ -187,9 +189,9 @@ class Git(Repository):
         branches_to_rebase = self._find_branches_to_rebase(commits)
 
         for branch, nodes in branches_to_rebase.items():
-            self.checkout(branch)
-            self._rebase(*nodes)
+            self._rebase_branch(branch, *nodes)
 
+        # Return to the newly-updated branch. This should be a noop file-mtime-wise
         self.checkout(self.branch)
 
     def refresh_commit_stack(self, commits: List[Commit]):
@@ -727,6 +729,28 @@ class Git(Repository):
 
     def _rebase(self, newbase: str, upstream: str):
         self.git_call(["rebase", "--quiet", "--onto", newbase, upstream])
+
+    def _rebase_branch(self, branch: str, newbase: str, upstream: str):
+        # get list of commits from upstream
+        commits = self._get_commits_info(upstream, branch)
+        # rebase each commit on the precedent
+        base = newbase
+        for c_info in commits:
+            if not c_info:
+                continue
+            commit = self._commit_from_info(c_info)
+            assert commit.tree_hash
+            assert commit.author_date
+            base = self._commit_tree(
+                base,
+                commit.tree_hash,
+                commit.message,
+                commit.author_name,
+                commit.author_email,
+                commit.author_date,
+            )
+        # update branch label
+        self.git_call(["update-ref", branch, base])
 
     @lru_cache(maxsize=128)  # noqa: B019
     def _file_size(self, blob: str) -> int:
